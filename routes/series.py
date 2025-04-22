@@ -1,32 +1,63 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Form, HTTPException
+from mysql.connector import Error
 from database import get_connection
 
-router = APIRouter(prefix="/series")  # <- isso é importante
+router = APIRouter(prefix="/series")
 
 @router.get("/")
 def listar_series():
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM serie")
-    series = cursor.fetchall()
+        cursor.execute("SELECT * FROM serie")
+        series = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
-    return series
+        return series
+
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}")
+
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass  # Caso a conexão nem tenha sido estabelecida
+
 
 @router.post("/")
-def criar_serie(titulo: str, descricao: str, ano: int, id_categoria: int):
-    conn = get_connection()
-    cursor = conn.cursor()
+def criar_serie(
+    titulo: str = Form(...),
+    descricao: str = Form(...),
+    ano: int = Form(...),
+    id_categoria: int = Form(...)
+):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    cursor.execute(
-        "INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s)",
-        (titulo, descricao, ano, id_categoria)
-    )
-    conn.commit()
-    novo_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s)",
+            (titulo, descricao, ano, id_categoria)
+        )
+        conn.commit()
+        novo_id = cursor.lastrowid
 
-    cursor.close()
-    conn.close()
-    return {"id": novo_id, "mensagem": "Série criada com sucesso"}
+        return {"id": novo_id, "mensagem": "Série criada com sucesso"}
+
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}")
+
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
