@@ -6,6 +6,7 @@ from database import get_connection
 router = APIRouter(prefix="/series")
 
 class Serie(BaseModel):
+    id: int
     titulo: str
     descricao: str
     ano: int
@@ -18,8 +19,8 @@ def criar_serie(serie: Serie):
         cursor = conn.cursor()
 
         cursor.execute(
-            "INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s)",
-            (serie.titulo, serie.descricao, serie.ano, serie.id_categoria)
+            "INSERT INTO serie (id,titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s, %s)",
+            (serie.id,serie.titulo, serie.descricao, serie.ano, serie.id_categoria)
         )
         conn.commit()
         novo_id = cursor.lastrowid
@@ -58,4 +59,4 @@ def listar_series():
             cursor.close()
             conn.close()
         except:
-            pass  # Caso a conexão nem tenha sido estabelecida
+            pass 
