@@ -31,3 +31,19 @@ def listar_avaliacoes_series():
     finally:
         cursor.close()
         conn.close()
+
+@router.put("/")
+def atualizar_avaliacao_serie(avaliacao_serie: Avaliacao_Serie):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE avaliacao_serie SET nota = %s, comentario = %s, data_avaliacao = %s WHERE id = %s AND id_serie = %s", (avaliacao_serie.nota, avaliacao_serie.comentario, avaliacao_serie.data_avaliacao, avaliacao_serie.id, avaliacao_serie.id_serie))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="avaliacao_serie não encontrado")
+        return {"mensagem": "avaliacao_serie atualizado com sucesso"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()

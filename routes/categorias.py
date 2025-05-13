@@ -31,3 +31,19 @@ def listar_categorias():
     finally:
         cursor.close()
         conn.close()
+
+router.put("/")
+def atualizar_categoria(categoria: Categoria):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE categoria SET nome = %s WHERE id = %s", (categoria.nome, categoria.id))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Categoria não encontrado")
+        return {"mensagem": "Categoria atualizado com sucesso"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()

@@ -31,3 +31,19 @@ def listar_atores_series():
     finally:
         cursor.close()
         conn.close()
+
+@router.put("/")
+def atualizar_ator_serie(ator_serie: Ator_Serie):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE ator_serie SET personagem = %s WHERE id_ator = %s AND id_serie = %s", (ator_serie.personagem, ator_serie.id_ator, ator_serie.id_serie))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Ator_serie não encontrado")
+        return {"mensagem": "Ator_serie atualizado com sucesso"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
