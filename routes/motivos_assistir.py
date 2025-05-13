@@ -47,3 +47,19 @@ def atualizar_motivo_assistr(motivo_assistir: Motivo_Assistir):
     finally:
         cursor.close()
         conn.close()
+
+@router.delete("/")
+def deletar_motivo_assistr(id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM motivo_assistir WHERE id = %s", (id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Motivo_Assistir não encontrado")
+        return {"mensagem": "Motivo_Assistir deletado com sucesso"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()

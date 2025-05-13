@@ -47,3 +47,19 @@ def atualizar_ator(ator: Ator):
     finally:
         cursor.close()
         conn.close()
+
+@router.delete("/")
+def deletar_ator(id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ator WHERE id = %s", (id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Ator não encontrado")
+        return {"mensagem": "Ator deletado com sucesso"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
