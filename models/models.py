@@ -1,3 +1,4 @@
+import datetime
 from pydantic import BaseModel
 
 class Serie(BaseModel):
@@ -25,7 +26,7 @@ class Avaliacao_Serie(BaseModel):
     id_serie: int
     nota: int
     comentario: str
-    data_avaliacao: str
+    data_avaliacao: datetime.date
 
 class Motivo_Assistir(BaseModel):
     id: int
