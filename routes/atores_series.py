@@ -1,66 +1,46 @@
 from fastapi import APIRouter, HTTPException
-from mysql.connector import Error
 from models.models import Ator_Serie
-from database import get_connection
+import os
 
 router = APIRouter(prefix="/atores_series")
+DATA_FILE = "atores_series.txt"
 
-@router.post("/")
-def criar_ator_serie(ator_serie: Ator_Serie):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO ator (id_ator,id_serie, personagem) VALUES (%s, %s, %s)", (ator_serie.id_ator, ator_serie.id_serie, ator_serie.personagem))
-        conn.commit()
-        return {"id": cursor.lastrowid, "mensagem": "Ator_serie criado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def ler():
+    if not os.path.exists(DATA_FILE): return []
+    with open(DATA_FILE) as f: return [l.strip().split("|") for l in f]
+
+def salvar(linhas):
+    with open(DATA_FILE, "w") as f: f.writelines(["|".join(l)+"\n" for l in linhas])
 
 @router.get("/")
-def listar_atores_series():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM ator_serie")
-        return cursor.fetchall()
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def listar():
+    return [{"id_ator": int(l[0]), "id_serie": int(l[1])} for l in ler()]
+
+@router.post("/")
+def criar(a: Ator_Serie):
+    linhas = ler()
+    if [str(a.id_ator), str(a.id_serie)] in linhas:
+        raise HTTPException(400, "Relação já existe")
+    linhas.append([str(a.id_ator), str(a.id_serie)])
+    salvar(linhas)
+    return {"mensagem": "Criado com sucesso"}
 
 @router.put("/")
-def atualizar_ator_serie(ator_serie: Ator_Serie):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE ator_serie SET personagem = %s WHERE id_ator = %s AND id_serie = %s", (ator_serie.personagem, ator_serie.id_ator, ator_serie.id_serie))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Ator_serie não encontrado")
-        return {"mensagem": "Ator_serie atualizado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def atualizar(a: Ator_Serie):
+    linhas = ler()
+    for i, l in enumerate(linhas):
+        if int(l[0]) == a.id:
+            linhas[i] = [str(a.id), a.nome]
+            salvar(linhas)
+            return {"mensagem": "Atualizado com sucesso"}
+    raise HTTPException(404, "Não encontrado")
 
 
 @router.delete("/")
-def deletar_ator_serie(id_ator: int, id_serie: int):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM ator_serie WHERE id_ator = %s AND id_serie = %s", (id_ator, id_serie))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Ator_serie não encontrado")
-        return {"mensagem": "Ator_serie deletado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def deletar(id_ator: int, id_serie: int):
+    linhas = ler()
+    novas = [l for l in linhas if not (int(l[0]) == id_ator and int(l[1]) == id_serie)]
+    if len(novas) == len(linhas): raise HTTPException(404, "Relação não encontrada")
+    salvar(novas)
+    return {"mensagem": "Deletado com sucesso"}
+

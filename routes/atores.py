@@ -1,65 +1,46 @@
 from fastapi import APIRouter, HTTPException
-from mysql.connector import Error
 from models.models import Ator
-from database import get_connection
+import os
 
 router = APIRouter(prefix="/atores")
+DATA_FILE = "atores.txt"
 
-@router.post("/")
-def criar_ator(ator: Ator):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO ator (id, nome) VALUES (%s, %s)", (ator.id, ator.nome))
-        conn.commit()
-        return {"id": cursor.lastrowid, "mensagem": "Ator criado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def ler():
+    if not os.path.exists(DATA_FILE): return []
+    with open(DATA_FILE) as f: return [l.strip().split("|") for l in f]
+
+def salvar(linhas):
+    with open(DATA_FILE, "w") as f: f.writelines(["|".join(l)+"\n" for l in linhas])
 
 @router.get("/")
-def listar_atores():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM ator")
-        return cursor.fetchall()
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def listar():
+    return [{"id": int(l[0]), "nome": l[1]} for l in ler()]
+
+@router.post("/")
+def criar(a: Ator):
+    linhas = ler()
+    for l in linhas:
+        if int(l[0]) == a.id:
+            raise HTTPException(400, "ID já existe")
+    linhas.append([str(a.id), a.nome])
+    salvar(linhas)
+    return {"mensagem": "Criado com sucesso"}
 
 @router.put("/")
-def atualizar_ator(ator: Ator):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE ator SET nome = %s WHERE id = %s", (ator.nome, ator.id))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Ator não encontrado")
-        return {"mensagem": "Ator atualizado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def atualizar(a: Ator):
+    linhas = ler()
+    for i, l in enumerate(linhas):
+        if int(l[0]) == a.id:
+            linhas[i] = [str(a.id), a.nome]
+            salvar(linhas)
+            return {"mensagem": "Atualizado com sucesso"}
+    raise HTTPException(404, "Não encontrado")
 
 @router.delete("/")
-def deletar_ator(id: int):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM ator WHERE id = %s", (id,))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Ator não encontrado")
-        return {"mensagem": "Ator deletado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def deletar(id: int):
+    linhas = ler()
+    novas = [l for l in linhas if int(l[0]) != id]
+    if len(linhas) == len(novas): raise HTTPException(404, "Não encontrado")
+    salvar(novas)
+    return {"mensagem": "Deletado com sucesso"}
+

@@ -1,65 +1,49 @@
 from fastapi import APIRouter, HTTPException
-from mysql.connector import Error
 from models.models import Serie
-from database import get_connection
+import os
 
 router = APIRouter(prefix="/series")
+DATA_FILE = "series.txt"
 
-@router.post("/")
-def criar_serie(serie: Serie):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO serie (id, titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s, %s)", (serie.id, serie.titulo, serie.descricao, serie.ano, serie.id_categoria))
-        conn.commit()
-        return {"id": cursor.lastrowid, "mensagem": "Serie criado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def ler_arquivo():
+    if not os.path.exists(DATA_FILE):
+        return []
+    with open(DATA_FILE, "r") as f:
+        return [linha.strip().split("|") for linha in f.readlines()]
+
+def salvar_arquivo(linhas):
+    with open(DATA_FILE, "w") as f:
+        f.writelines([f"{'|'.join(l)}\n" for l in linhas])
 
 @router.get("/")
 def listar_series():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM serie")
-        return cursor.fetchall()
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+    return [{"id": int(l[0]), "titulo": l[1], "descricao": l[2], "ano": int(l[3]), "id_categoria": int(l[4])} for l in ler_arquivo()]
+
+@router.post("/")
+def criar_serie(serie: Serie):
+    linhas = ler_arquivo()
+    for l in linhas:
+        if int(l[0]) == serie.id:
+            raise HTTPException(status_code=400, detail="ID já existe")
+    linhas.append([str(serie.id), serie.titulo, serie.descricao, str(serie.ano), str(serie.id_categoria)])
+    salvar_arquivo(linhas)
+    return {"mensagem": "Serie criada com sucesso"}
 
 @router.put("/")
 def atualizar_serie(serie: Serie):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE serie SET titulo = %s, descricao = %s, ano_lancamento = %s, id_categoria = %s WHERE id = %s", (serie.titulo, serie.descricao, serie.ano, serie.id_categoria, serie.id))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Serie não encontrado")
-        return {"mensagem": "Serie atualizado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+    linhas = ler_arquivo()
+    for i, l in enumerate(linhas):
+        if int(l[0]) == serie.id:
+            linhas[i] = [str(serie.id), serie.titulo, serie.descricao, str(serie.ano), str(serie.id_categoria)]
+            salvar_arquivo(linhas)
+            return {"mensagem": "Serie atualizada com sucesso"}
+    raise HTTPException(status_code=404, detail="Serie não encontrada")
 
 @router.delete("/")
 def deletar_serie(id: int):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM serie WHERE id = %s", (id,))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Serie não encontrado")
-        return {"mensagem": "Serie deletado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+    linhas = ler_arquivo()
+    novas = [l for l in linhas if int(l[0]) != id]
+    if len(linhas) == len(novas):
+        raise HTTPException(status_code=404, detail="Serie não encontrada")
+    salvar_arquivo(novas)
+    return {"mensagem": "Serie deletada com sucesso"}

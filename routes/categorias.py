@@ -1,65 +1,45 @@
 from fastapi import APIRouter, HTTPException
-from mysql.connector import Error
 from models.models import Categoria
-from database import get_connection
+import os
 
 router = APIRouter(prefix="/categorias")
+DATA_FILE = "categorias.txt"
 
-@router.post("/")
-def criar_categoria(categoria: Categoria):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO ator (id, nome) VALUES (%s, %s)", (categoria.id, categoria.nome))
-        conn.commit()
-        return {"id": cursor.lastrowid, "mensagem": "Categoria criado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def ler():
+    if not os.path.exists(DATA_FILE): return []
+    with open(DATA_FILE) as f: return [l.strip().split("|") for l in f]
+
+def salvar(linhas):
+    with open(DATA_FILE, "w") as f: f.writelines(["|".join(l)+"\n" for l in linhas])
 
 @router.get("/")
-def listar_categorias():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM categoria")
-        return cursor.fetchall()
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def listar():
+    return [{"id": int(l[0]), "nome": l[1]} for l in ler()]
 
-router.put("/")
-def atualizar_categoria(categoria: Categoria):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE categoria SET nome = %s WHERE id = %s", (categoria.nome, categoria.id))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Categoria não encontrado")
-        return {"mensagem": "Categoria atualizado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+@router.post("/")
+def criar(c: Categoria):
+    linhas = ler()
+    for l in linhas:
+        if int(l[0]) == c.id:
+            raise HTTPException(400, "ID já existe")
+    linhas.append([str(c.id), c.nome])
+    salvar(linhas)
+    return {"mensagem": "Criado com sucesso"}
+
+@router.put("/")
+def atualizar(c: Categoria):
+    linhas = ler()
+    for i, l in enumerate(linhas):
+        if int(l[0]) == c.id:
+            linhas[i] = [str(c.id), c.nome]
+            salvar(linhas)
+            return {"mensagem": "Atualizado com sucesso"}
+    raise HTTPException(404, "Não encontrado")
 
 @router.delete("/")
-def deletar_categoria(id: int):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM categoria WHERE id = %s", (id,))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Categoria não encontrado")
-        return {"mensagem": "Categoria deletado com sucesso"}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=f"Erro de banco de dados: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
+def deletar(id: int):
+    linhas = ler()
+    novas = [l for l in linhas if int(l[0]) != id]
+    if len(linhas) == len(novas): raise HTTPException(404, "Não encontrado")
+    salvar(novas)
+    return {"mensagem": "Deletado com sucesso"}
